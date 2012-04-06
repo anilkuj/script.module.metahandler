@@ -28,6 +28,7 @@ from datetime import datetime
 import time
 from TMDB import TMDB
 from thetvdbapi import TheTVDB
+import xbmcvfs
 
 #necessary so that the metacontainers.py can use the scrapers
 import xbmc, xbmcaddon
@@ -56,8 +57,13 @@ sys.path.append((os.path.split(addon_path))[0])
 def make_dir(mypath, dirname):
     ''' Creates sub-directories if they are not found. '''
     subpath = os.path.join(mypath, dirname)
-    if not os.path.exists(subpath): os.makedirs(subpath)
+    subpath = xbmc.validatePath(subpath)
+    if not xbmcvfs.exists(subpath): xbmcvfs.mkdir(subpath)
     return subpath
+
+def validatePathJoin(path, name):
+    print '>>>>>>>>>>>>>>>>>>>>>>>>>>>> in validatePathJoin %s  : %s' %(path, name)
+    return xbmc.validatePath(os.path.join(path, name))
 
 
 def bool2string(myinput):
@@ -78,17 +84,20 @@ class MetaData:
     '''  
     
      
-    def __init__(self, path='special://profile/addon_data/script.module.metahandler/', preparezip=False):
+    def __init__(self, path='special://profile/addon_data/script.module.metahandler/', videodb_path='special://profile/addon_data/script.module.metahandler/', preparezip=False):
 
         #Check if a path has been set in the addon settings
         settings_path = addon.getSetting('meta_folder_location')
-        
+        print '***************** In __init__ settings_path is %s' % settings_path
         if settings_path:
             self.path = xbmc.translatePath(settings_path)
         else:
             self.path = xbmc.translatePath(path)
-        
+
+        print '***************** In __init__ path is %s' % self.path
         self.cache_path = make_dir(self.path, 'meta_cache')
+        print '***************** In __init__ cache_path is %s' % self.cache_path
+        videodb_path = make_dir(xbmc.translatePath(videodb_path), 'meta_cache')
 
         if preparezip:
             #create container working directory
@@ -105,7 +114,7 @@ class MetaData:
 
         # control whether class is being used to prepare pre-packaged .zip
         self.classmode = bool2string(preparezip)
-        self.videocache = os.path.join(self.cache_path, 'video_cache.db')
+        self.videocache = validatePathJoin(videodb_path, 'video_cache.db')
 
         self.tvpath = make_dir(self.cache_path, self.type_tvshow)
         self.tvcovers = make_dir(self.tvpath, 'covers')
@@ -408,11 +417,13 @@ class MetaData:
             name (str): filename
         '''                 
     
-        if not os.path.exists(path):
-            os.makedirs(path)
-        
-        full_path = os.path.join(path, name)
-        self._dl_code(url, full_path)              
+##        if not os.path.exists(path):
+##            os.makedirs(path)
+
+#        if not xbmcvfs.exists(path): xbmcvfs.mkdir(path)
+
+        full_path = validatePathJoin(path, name)
+        self._dl_code(url, full_path, name)              
 
 
     def _picname(self,url):
@@ -428,7 +439,7 @@ class MetaData:
         return picname[-1]
          
         
-    def _dl_code(self,url,mypath):
+    def _dl_code(self,url,mypath, name):
         '''
         Downloads images to store locally       
         
@@ -442,9 +453,20 @@ class MetaData:
           
             try:
                  data = net.http_GET(url).content
-                 fh = open(mypath, 'wb')
-                 fh.write(data)  
-                 fh.close()
+                 if 'smb://' in mypath:
+                     print 'in if samba'
+                     temppath = os.path.join(xbmc.translatePath( "special://temp" ), name )
+                     fh = open(temppath, 'wb')
+                     fh.write(data)  
+                     fh.close()
+                     copy = xbmcvfs.copy(temppath, mypath)
+                     if copy:
+                         xbmcvfs.delete(temppath)
+                 else:
+                     print 'in else samba'
+                     fh = open(mypath, 'wb')
+                     fh.write(data)  
+                     fh.close()
             except Exception, e:
                 print 'Image download failed: %s ' % e
         else:
@@ -653,10 +675,10 @@ class MetaData:
         #Add TVShowTitle infolabel
         if type==self.type_tvshow:
             meta['TVShowTitle'] = meta['title']
-        
+
         #if cache row says there are pre-packed images then either use them or create them
         if meta['imgs_prepacked'] == 'true':
-
+                print 'in if'
                 #define the image paths               
                 if type == self.type_movie:
                     root_covers = self.mvcovers
@@ -668,25 +690,25 @@ class MetaData:
                 
                 if meta['cover_url']:
                     cover_name = self._picname(meta['cover_url'])
-                    cover_path = os.path.join(root_covers, cover_name[0].lower())
+                    cover_path = make_dir(root_covers, cover_name[0].lower())
                     if self.classmode == 'true':
                         self._downloadimages(meta['cover_url'], cover_path, cover_name)
-                    meta['cover_url'] = os.path.join(cover_path, cover_name)
+                    meta['cover_url'] = validatePathJoin(cover_path, cover_name)
                 
                 if meta['backdrop_url']:
                     backdrop_name = self._picname(meta['backdrop_url'])
-                    backdrop_path=os.path.join(root_backdrops, backdrop_name[0].lower())
+                    backdrop_path=make_dir(root_backdrops, backdrop_name[0].lower())
                     if self.classmode == 'true':
                         self._downloadimages(meta['backdrop_url'], backdrop_path, backdrop_name)
-                    meta['backdrop_url'] = os.path.join(backdrop_path, backdrop_name)
+                    meta['backdrop_url'] = validatePathJoin(backdrop_path, backdrop_name)
 
                 if meta.has_key('banner_url'):
                     if meta['banner_url']:
                         banner_name = self._picname(meta['banner_url'])
-                        banner_path=os.path.join(root_banners, banner_name[0].lower())
+                        banner_path=make_dir(root_banners, banner_name[0].lower())
                         if self.classmode == 'true':
                             self._downloadimages(meta['banner_url'], banner_path, banner_name)
-                        meta['banner_url'] = os.path.join(banner_path, banner_name)        
+                        meta['banner_url'] = validatePathJoin(banner_path, banner_name)        
 
         print 'Returned Meta:', meta
         return meta  
