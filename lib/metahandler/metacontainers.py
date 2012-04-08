@@ -10,6 +10,7 @@ currently very specific to icefilms.info
 
 import os,sys
 import shutil
+import xbmcvfs
 
 #necessary so that the metacontainers.py can use the scrapers
 try: import xbmc, xbmcaddon
@@ -58,7 +59,7 @@ class MetaContainer:
      
         print '---------------------------------------------------------------------------------------'
         #delete and re-create work_path to ensure no previous files are left over
-        if os.path.exists(self.work_path):
+        if xbmcvfs.exists(self.work_path):
             import shutil
             try:
                 print 'Removing previous work folder: %s' % self.work_path
@@ -81,7 +82,7 @@ class MetaContainer:
 
     def make_dir(self, mypath):
         ''' Creates sub-directories if they are not found. '''
-        if not os.path.exists(mypath): os.makedirs(mypath)   
+        if not xbmcvfs.exists(mypath): xbmcvfs.mkdir(mypath)
 
    
     def _del_metadir(self, path=''):
@@ -94,7 +95,7 @@ class MetaContainer:
         #Nuke the old meta_caches folder (if it exists) and install this meta_caches folder.
         #Will only ever delete a meta_caches folder, so is farly safe (won't delete anything it is fed)
     
-        if os.path.exists(catch_path):
+        if xbmcvfs.exists(catch_path):
                 try:
                     shutil.rmtree(catch_path)
                 except:
@@ -107,7 +108,7 @@ class MetaContainer:
 
     def _del_path(self, path):
     
-        if os.path.exists(path):
+        if xbmcvfs.exists(path):
                 try:
                     shutil.rmtree(path)
                 except:
